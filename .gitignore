@@ -1,0 +1,6 @@
+/target/
+/data/
+/.idea/
+*.iml
+/frontend/node_modules/
+*.tar

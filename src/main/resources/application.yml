@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: clawhub
+  datasource:
+    url: jdbc:h2:file:./data/clawhub;MODE=PostgreSQL;AUTO_SERVER=TRUE
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+
+clawhub:
+  docker:
+    executable: docker
+  platform:
+    instance-limit: 5
+  bootstrap:
+    admin:
+      enabled: true
+      username: hhlys
+      password: Hl123321*
