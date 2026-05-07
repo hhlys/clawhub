@@ -42,6 +42,15 @@ export interface Capacity {
   remainingInstanceSlots: number;
 }
 
+export interface ProvisioningProfile {
+  defaultHost: string;
+  containerPort: number;
+  nextAvailableHostPort: number;
+  usedHostPorts: number[];
+  defaultProductVersion: string;
+  supportedProductVersions: string[];
+}
+
 export interface ApiError {
   timestamp: string;
   status: number;

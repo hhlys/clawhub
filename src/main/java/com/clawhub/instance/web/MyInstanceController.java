@@ -38,16 +38,7 @@ public class MyInstanceController {
         return ManagedInstanceResponse.from(managedInstanceService.createForOwner(
                 principal.getId(),
                 request.productType(),
-                request.instanceName(),
-                request.containerName(),
-                request.dockerImage(),
-                request.host(),
-                request.hostPort(),
-                request.containerPort(),
-                request.dataVolumeHostPath(),
-                request.dataVolumeContainerPath(),
-                request.publicBaseUrl(),
-                request.autoStart()
+                request.productVersion()
         ));
     }
 

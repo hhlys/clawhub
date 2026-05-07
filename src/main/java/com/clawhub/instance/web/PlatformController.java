@@ -19,4 +19,9 @@ public class PlatformController {
     public PlatformCapacityResponse capacity() {
         return managedInstanceService.getCapacity();
     }
+
+    @GetMapping("/provisioning")
+    public ProvisioningProfileResponse provisioning() {
+        return managedInstanceService.getProvisioningProfile();
+    }
 }

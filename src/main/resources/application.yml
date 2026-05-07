@@ -18,6 +18,14 @@ clawhub:
     executable: docker
   platform:
     instance-limit: 5
+  provisioning:
+    default-host: 101.251.162.105
+    host-port-start: 18088
+    container-port: 8088
+    data-volume-host-root-path: /srv/clawhub/instances
+    data-volume-container-path: /root/.qwenpaw
+    qwenpaw-image: qwenpaw:local
+    default-product-version: "1.0"
   bootstrap:
     admin:
       enabled: true

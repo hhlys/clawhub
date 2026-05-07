@@ -36,6 +36,7 @@ public class AdminInstanceController {
         return ManagedInstanceResponse.from(managedInstanceService.createForOwner(
                 request.ownerUserId(),
                 request.productType(),
+                request.productVersion(),
                 request.instanceName(),
                 request.containerName(),
                 request.dockerImage(),

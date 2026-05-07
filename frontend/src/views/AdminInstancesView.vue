@@ -12,6 +12,7 @@ const message = ref("");
 const form = reactive({
   ownerUserId: 0,
   productType: "QWENPAW" as ProductType,
+  productVersion: "1.0",
   instanceName: "",
   containerName: "",
   dockerImage: "qwenpaw:local",
@@ -138,6 +139,10 @@ onMounted(async () => {
               <option value="OPENCLAW">OpenClaw</option>
               <option value="OTHER">Other</option>
             </select>
+          </div>
+          <div class="field">
+            <label>Version</label>
+            <input v-model="form.productVersion" />
           </div>
           <div class="field">
             <label>Instance Name</label>

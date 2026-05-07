@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 public record AdminCreateInstanceRequest(
         @NotNull Long ownerUserId,
         @NotNull ProductType productType,
+        @NotBlank String productVersion,
         @NotBlank String instanceName,
         @NotBlank String containerName,
         @NotBlank String dockerImage,

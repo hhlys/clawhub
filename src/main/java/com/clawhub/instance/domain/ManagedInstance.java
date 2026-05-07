@@ -31,6 +31,9 @@ public class ManagedInstance {
     @Column(nullable = false, length = 32)
     private ProductType productType;
 
+    @Column(length = 32)
+    private String productVersion;
+
     @Column(nullable = false, length = 128, unique = true)
     private String instanceName;
 
@@ -98,6 +101,14 @@ public class ManagedInstance {
 
     public void setProductType(ProductType productType) {
         this.productType = productType;
+    }
+
+    public String getProductVersion() {
+        return productVersion;
+    }
+
+    public void setProductVersion(String productVersion) {
+        this.productVersion = productVersion;
     }
 
     public String getInstanceName() {

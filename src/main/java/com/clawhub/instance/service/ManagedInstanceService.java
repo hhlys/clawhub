@@ -2,16 +2,19 @@ package com.clawhub.instance.service;
 
 import com.clawhub.common.error.CapacityExceededException;
 import com.clawhub.common.error.ConflictException;
+import com.clawhub.config.ClawProvisioningProperties;
 import com.clawhub.config.PlatformLimitsProperties;
 import com.clawhub.instance.domain.InstanceStatus;
 import com.clawhub.instance.domain.ManagedInstance;
 import com.clawhub.instance.domain.ProductType;
 import com.clawhub.instance.repo.ManagedInstanceRepository;
 import com.clawhub.instance.web.PlatformCapacityResponse;
+import com.clawhub.instance.web.ProvisioningProfileResponse;
 import com.clawhub.user.domain.AppUser;
 import com.clawhub.user.domain.UserStatus;
 import com.clawhub.user.service.AppUserService;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -27,17 +30,20 @@ public class ManagedInstanceService {
     private final DockerRuntimeService dockerRuntimeService;
     private final AppUserService userService;
     private final PlatformLimitsProperties platformLimitsProperties;
+    private final ClawProvisioningProperties provisioningProperties;
 
     public ManagedInstanceService(
             ManagedInstanceRepository repository,
             DockerRuntimeService dockerRuntimeService,
             AppUserService userService,
-            PlatformLimitsProperties platformLimitsProperties
+            PlatformLimitsProperties platformLimitsProperties,
+            ClawProvisioningProperties provisioningProperties
     ) {
         this.repository = repository;
         this.dockerRuntimeService = dockerRuntimeService;
         this.userService = userService;
         this.platformLimitsProperties = platformLimitsProperties;
+        this.provisioningProperties = provisioningProperties;
     }
 
     @Transactional(readOnly = true)
@@ -57,10 +63,69 @@ public class ManagedInstanceService {
         return new PlatformCapacityResponse(limit, current, Math.max(0, limit - current));
     }
 
+    @Transactional(readOnly = true)
+    public ProvisioningProfileResponse getProvisioningProfile() {
+        List<Integer> usedHostPorts = repository.findAllByOrderByHostPortAsc().stream()
+                .map(ManagedInstance::getHostPort)
+                .toList();
+        return new ProvisioningProfileResponse(
+                provisioningProperties.getDefaultHost(),
+                provisioningProperties.getContainerPort(),
+                findNextAvailableHostPort(),
+                usedHostPorts,
+                provisioningProperties.getDefaultProductVersion(),
+                List.of(provisioningProperties.getDefaultProductVersion())
+        );
+    }
+
     @Transactional
     public ManagedInstance createForOwner(
             Long ownerUserId,
             ProductType productType,
+            String productVersion
+    ) {
+        AppUser ownerUser = validateCreatePreconditions(ownerUserId);
+        if (productType != ProductType.QWENPAW) {
+            throw new IllegalArgumentException("Only QwenPaw is currently supported");
+        }
+        if (!provisioningProperties.getDefaultProductVersion().equals(productVersion)) {
+            throw new IllegalArgumentException("Unsupported product version: " + productVersion);
+        }
+
+        String sanitizedUsername = ownerUser.getUsername().toLowerCase();
+        String instanceName = sanitizedUsername + "-claw-instance";
+        String containerName = sanitizedUsername + "-claw-container";
+        int hostPort = findNextAvailableHostPort();
+        String host = provisioningProperties.getDefaultHost();
+        int containerPort = provisioningProperties.getContainerPort();
+        String dockerImage = provisioningProperties.getQwenpawImage();
+        String dataVolumeHostPath = provisioningProperties.getDataVolumeHostRootPath() + "/" + sanitizedUsername + "-claw-data";
+        String dataVolumeContainerPath = provisioningProperties.getDataVolumeContainerPath();
+        String publicBaseUrl = "http://" + host + ":" + hostPort;
+
+        validateUniqueFields(instanceName, containerName, hostPort);
+        return persistAndOptionallyStart(
+                ownerUser,
+                productType,
+                productVersion,
+                instanceName,
+                containerName,
+                dockerImage,
+                host,
+                hostPort,
+                containerPort,
+                dataVolumeHostPath,
+                dataVolumeContainerPath,
+                publicBaseUrl,
+                true
+        );
+    }
+
+    @Transactional
+    public ManagedInstance createForOwner(
+            Long ownerUserId,
+            ProductType productType,
+            String productVersion,
             String instanceName,
             String containerName,
             String dockerImage,
@@ -72,42 +137,23 @@ public class ManagedInstanceService {
             String publicBaseUrl,
             boolean autoStart
     ) {
-        AppUser ownerUser = userService.getRequired(ownerUserId);
-        if (ownerUser.getStatus() != UserStatus.ACTIVE) {
-            throw new IllegalArgumentException("Target user is not active");
-        }
-        if (repository.existsByOwnerUserId(ownerUserId)) {
-            throw new ConflictException(SINGLE_INSTANCE_MESSAGE);
-        }
-        if (repository.count() >= platformLimitsProperties.getInstanceLimit()) {
-            throw new CapacityExceededException(INSTANCE_LIMIT_MESSAGE);
-        }
+        AppUser ownerUser = validateCreatePreconditions(ownerUserId);
         validateUniqueFields(instanceName, containerName, hostPort);
-
-        ManagedInstance instance = new ManagedInstance();
-        instance.setOwnerUser(ownerUser);
-        instance.setProductType(productType);
-        instance.setInstanceName(instanceName);
-        instance.setContainerName(containerName);
-        instance.setDockerImage(dockerImage);
-        instance.setHost(host);
-        instance.setHostPort(hostPort);
-        instance.setContainerPort(containerPort);
-        instance.setDataVolumeHostPath(dataVolumeHostPath);
-        instance.setDataVolumeContainerPath(dataVolumeContainerPath);
-        instance.setPublicBaseUrl(publicBaseUrl);
-        instance.setStatus(InstanceStatus.PENDING);
-        repository.save(instance);
-
-        if (autoStart) {
-            dockerRuntimeService.createAndStart(instance);
-            instance.setStatus(InstanceStatus.RUNNING);
-        } else {
-            dockerRuntimeService.createAndStart(instance);
-            dockerRuntimeService.stop(instance);
-            instance.setStatus(InstanceStatus.STOPPED);
-        }
-        return repository.save(instance);
+        return persistAndOptionallyStart(
+                ownerUser,
+                productType,
+                productVersion,
+                instanceName,
+                containerName,
+                dockerImage,
+                host,
+                hostPort,
+                containerPort,
+                dataVolumeHostPath,
+                dataVolumeContainerPath,
+                publicBaseUrl,
+                autoStart
+        );
     }
 
     @Transactional
@@ -182,6 +228,73 @@ public class ManagedInstanceService {
         if (repository.existsByHostPort(hostPort)) {
             throw new ConflictException("hostPort already exists");
         }
+    }
+
+    private AppUser validateCreatePreconditions(Long ownerUserId) {
+        AppUser ownerUser = userService.getRequired(ownerUserId);
+        if (ownerUser.getStatus() != UserStatus.ACTIVE) {
+            throw new IllegalArgumentException("Target user is not active");
+        }
+        if (repository.existsByOwnerUserId(ownerUserId)) {
+            throw new ConflictException(SINGLE_INSTANCE_MESSAGE);
+        }
+        if (repository.count() >= platformLimitsProperties.getInstanceLimit()) {
+            throw new CapacityExceededException(INSTANCE_LIMIT_MESSAGE);
+        }
+        return ownerUser;
+    }
+
+    private ManagedInstance persistAndOptionallyStart(
+            AppUser ownerUser,
+            ProductType productType,
+            String productVersion,
+            String instanceName,
+            String containerName,
+            String dockerImage,
+            String host,
+            Integer hostPort,
+            Integer containerPort,
+            String dataVolumeHostPath,
+            String dataVolumeContainerPath,
+            String publicBaseUrl,
+            boolean autoStart
+    ) {
+        ManagedInstance instance = new ManagedInstance();
+        instance.setOwnerUser(ownerUser);
+        instance.setProductType(productType);
+        instance.setProductVersion(productVersion);
+        instance.setInstanceName(instanceName);
+        instance.setContainerName(containerName);
+        instance.setDockerImage(dockerImage);
+        instance.setHost(host);
+        instance.setHostPort(hostPort);
+        instance.setContainerPort(containerPort);
+        instance.setDataVolumeHostPath(dataVolumeHostPath);
+        instance.setDataVolumeContainerPath(dataVolumeContainerPath);
+        instance.setPublicBaseUrl(publicBaseUrl);
+        instance.setStatus(InstanceStatus.PENDING);
+        repository.save(instance);
+
+        if (autoStart) {
+            dockerRuntimeService.createAndStart(instance);
+            instance.setStatus(InstanceStatus.RUNNING);
+        } else {
+            dockerRuntimeService.createAndStart(instance);
+            dockerRuntimeService.stop(instance);
+            instance.setStatus(InstanceStatus.STOPPED);
+        }
+        return repository.save(instance);
+    }
+
+    private int findNextAvailableHostPort() {
+        List<Integer> usedPorts = new ArrayList<>(repository.findAllByOrderByHostPortAsc().stream()
+                .map(ManagedInstance::getHostPort)
+                .toList());
+        int candidate = provisioningProperties.getHostPortStart();
+        while (usedPorts.contains(candidate)) {
+            candidate++;
+        }
+        return candidate;
     }
 
     private ManagedInstance getRequired(Long id) {
