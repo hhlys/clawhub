@@ -29,8 +29,9 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) ->
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authentication required")))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/index.html", "/login", "/register", "/my-instance", "/admin/**", "/assets/**").permitAll()
+                        .requestMatchers("/", "/index.html", "/favicon.ico", "/login", "/register", "/my-instance", "/admin/**", "/assets/**").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
+                        .requestMatchers("/api/edge/nodes/register", "/api/edge/nodes/heartbeat").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/me/**", "/api/auth/me", "/api/auth/logout").authenticated()
                         .requestMatchers("/api/platform/capacity").permitAll()

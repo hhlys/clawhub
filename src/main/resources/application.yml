@@ -26,6 +26,9 @@ clawhub:
     data-volume-container-path: /root/.qwenpaw
     qwenpaw-image: qwenpaw:local
     default-product-version: "1.0"
+  edge:
+    registration-token:
+    offline-after: 90s
   bootstrap:
     admin:
       enabled: true

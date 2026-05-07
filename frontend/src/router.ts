@@ -5,6 +5,7 @@ import RegisterView from "./views/RegisterView.vue";
 import MyInstanceView from "./views/MyInstanceView.vue";
 import AdminUsersView from "./views/AdminUsersView.vue";
 import AdminInstancesView from "./views/AdminInstancesView.vue";
+import AdminEdgeNodesView from "./views/AdminEdgeNodesView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -14,7 +15,8 @@ const router = createRouter({
     { path: "/", redirect: "/my-instance" },
     { path: "/my-instance", component: MyInstanceView, meta: { requiresAuth: true } },
     { path: "/admin/users", component: AdminUsersView, meta: { requiresAuth: true, adminOnly: true } },
-    { path: "/admin/instances", component: AdminInstancesView, meta: { requiresAuth: true, adminOnly: true } }
+    { path: "/admin/instances", component: AdminInstancesView, meta: { requiresAuth: true, adminOnly: true } },
+    { path: "/admin/edge-nodes", component: AdminEdgeNodesView, meta: { requiresAuth: true, adminOnly: true } }
   ]
 });
 

@@ -324,6 +324,16 @@ select {
   color: #145438;
 }
 
+.status-online {
+  background: rgba(27, 122, 82, 0.13);
+  color: #145438;
+}
+
+.status-offline {
+  background: rgba(95, 80, 61, 0.12);
+  color: #5c4c39;
+}
+
 .status-stopped {
   background: rgba(95, 80, 61, 0.12);
   color: #5c4c39;

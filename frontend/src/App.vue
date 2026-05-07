@@ -20,6 +20,7 @@ const adminQuickLinks = computed(() => {
   }
 
   return [
+    { label: "Edge Nodes", to: "/admin/edge-nodes" },
     { label: "实例总览", to: "/admin/instances" },
     { label: "用户管理", to: "/admin/users" }
   ];

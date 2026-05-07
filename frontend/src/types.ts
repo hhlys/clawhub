@@ -36,6 +36,25 @@ export interface ManagedInstance {
   updatedAt: string;
 }
 
+export interface EdgeNode {
+  id: number;
+  nodeId: string;
+  tenantId: string;
+  groupName: string;
+  username: string;
+  hostIp: string | null;
+  port: number | null;
+  osName: string | null;
+  arch: string | null;
+  qwenpawVersion: string | null;
+  capabilities: string[];
+  metadata: Record<string, unknown>;
+  status: "online" | "offline";
+  lastSeenAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Capacity {
   instanceLimit: number;
   currentInstanceCount: number;
