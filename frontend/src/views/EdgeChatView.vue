@@ -89,6 +89,23 @@ async function selectSession(session: EdgeChatSession) {
   await refreshActiveMessages();
 }
 
+async function deleteSession(session: EdgeChatSession) {
+  if (streaming.value) {
+    return;
+  }
+  await apiRequest<void>(`/api/me/edge-chat/sessions/${session.id}`, {
+    method: "DELETE"
+  });
+  sessions.value = sessions.value.filter((item) => item.id !== session.id);
+  if (activeSession.value?.id === session.id) {
+    activeSession.value = null;
+    messages.value = [];
+    if (sessions.value.length > 0) {
+      await selectSession(sessions.value[0]);
+    }
+  }
+}
+
 async function refreshActiveMessages() {
   if (!activeSession.value || streaming.value) {
     return;
@@ -498,19 +515,31 @@ onUnmounted(() => {
 
       <div class="recent-list">
         <p>最近对话</p>
-        <button
+        <div
           v-for="session in sessions"
           :key="session.id"
-          :class="['recent-item', { active: activeSession?.id === session.id }]"
-          :disabled="streaming"
-          @click="selectSession(session)"
+          :class="['recent-row', { active: activeSession?.id === session.id }]"
         >
-          <strong>
-            {{ session.title || "新对话" }}
-            <span v-if="session.kind === 'task'" class="session-badge">任务</span>
-          </strong>
-          <small>{{ session.nodeName || session.nodeId }} · {{ formatTime(session.lastMessageAt) }}</small>
-        </button>
+          <button
+            class="recent-item"
+            :disabled="streaming"
+            @click="selectSession(session)"
+          >
+            <strong>
+              {{ session.title || "新对话" }}
+              <span v-if="session.kind === 'task'" class="session-badge">任务</span>
+            </strong>
+            <small>{{ session.nodeName || session.nodeId }} · {{ formatTime(session.lastMessageAt) }}</small>
+          </button>
+          <button
+            class="recent-delete"
+            :disabled="streaming"
+            title="删除会话"
+            @click.stop="deleteSession(session)"
+          >
+            ×
+          </button>
+        </div>
         <span v-if="!sessions.length && !loading" class="recent-empty">
           暂无云边对话
         </span>
@@ -529,12 +558,12 @@ onUnmounted(() => {
 
       <div v-if="loading" class="empty-chat">
         <h2>正在加载云边通道...</h2>
-        <p>ClawHub 正在读取边侧节点和最近对话。</p>
+        <p>龙虾控制台正在读取边侧节点和最近对话。</p>
       </div>
 
       <div v-else-if="!nodes.length" class="empty-chat">
         <h2>还没有可用边侧节点</h2>
-        <p>请先让边侧 QwenPaw 通过 cloud_edge custom channel 注册到 ClawHub。</p>
+        <p>请先让边侧 QwenPaw 通过云边通道注册到龙虾控制台。</p>
       </div>
 
       <div v-else class="dialog-stage">

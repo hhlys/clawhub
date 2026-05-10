@@ -75,6 +75,13 @@ public class InstanceChatStoreService {
     }
 
     @Transactional
+    public void deleteSession(Long ownerUserId, Long sessionId) {
+        InstanceChatSession session = getOwnedSession(ownerUserId, sessionId);
+        messageRepository.deleteBySessionId(session.getId());
+        sessionRepository.delete(session);
+    }
+
+    @Transactional
     public InstanceChatMessage appendMessage(
             Long sessionId,
             String role,

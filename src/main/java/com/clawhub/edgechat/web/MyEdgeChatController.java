@@ -5,6 +5,7 @@ import com.clawhub.user.service.UserPrincipal;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,6 +57,14 @@ public class MyEdgeChatController {
         return edgeChatService.listMessages(principal.getId(), sessionId).stream()
                 .map(EdgeChatMessageResponse::from)
                 .toList();
+    }
+
+    @DeleteMapping("/sessions/{sessionId}")
+    public void deleteSession(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long sessionId
+    ) {
+        edgeChatService.deleteSession(principal.getId(), sessionId);
     }
 
     @PostMapping("/stream")

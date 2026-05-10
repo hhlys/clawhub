@@ -5,6 +5,7 @@ import com.clawhub.config.BootstrapAdminProperties;
 import com.clawhub.config.BootstrapUserProperties;
 import com.clawhub.config.ClawProvisioningProperties;
 import com.clawhub.config.PlatformLimitsProperties;
+import com.clawhub.config.QwenPawModelProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -15,7 +16,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         BootstrapAdminProperties.class,
         BootstrapUserProperties.class,
         PlatformLimitsProperties.class,
-        ClawProvisioningProperties.class
+        ClawProvisioningProperties.class,
+        QwenPawModelProperties.class
 })
 public class ClawHubApplication {
 

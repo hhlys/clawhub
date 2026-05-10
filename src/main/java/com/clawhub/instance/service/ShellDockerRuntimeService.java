@@ -49,10 +49,16 @@ public class ShellDockerRuntimeService implements DockerRuntimeService {
         command.add("create");
         command.add("--name");
         command.add(instance.getContainerName());
+        command.add("-e");
+        command.add("QWENPAW_WORKING_DIR=" + QwenPawInstancePaths.workingContainerPath(instance));
+        command.add("-e");
+        command.add("QWENPAW_SECRET_DIR=" + QwenPawInstancePaths.secretContainerPath(instance));
         command.add("-p");
         command.add(instance.getHostPort() + ":" + instance.getContainerPort());
         command.add("-v");
-        command.add(instance.getDataVolumeHostPath() + ":" + instance.getDataVolumeContainerPath());
+        command.add(QwenPawInstancePaths.workingHostMount(instance) + ":" + QwenPawInstancePaths.workingContainerPath(instance));
+        command.add("-v");
+        command.add(QwenPawInstancePaths.secretHostMount(instance) + ":" + QwenPawInstancePaths.secretContainerPath(instance));
         command.add(instance.getDockerImage());
         return command;
     }

@@ -9,4 +9,6 @@ public interface InstanceChatMessageRepository extends JpaRepository<InstanceCha
     List<InstanceChatMessage> findTop200BySessionIdOrderBySequenceNoAscIdAsc(Long sessionId);
 
     long countBySessionId(Long sessionId);
+
+    void deleteBySessionId(Long sessionId);
 }

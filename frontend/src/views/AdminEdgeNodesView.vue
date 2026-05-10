@@ -201,7 +201,7 @@ onMounted(loadNodes);
       <div>
         <p class="eyebrow">Edge Nodes</p>
         <h2>边侧 QwenPaw 节点</h2>
-        <p class="muted">查看客户 Linux 环境中主动注册到 ClawHub 的边侧服务。</p>
+        <p class="muted">查看客户 Linux 环境中主动注册到龙虾控制台的边侧服务。</p>
       </div>
       <button class="btn btn-primary" :disabled="loading" @click="loadNodes">
         {{ loading ? "刷新中..." : "刷新" }}

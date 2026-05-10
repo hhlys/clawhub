@@ -27,10 +27,10 @@ async function submit() {
   <div class="auth-wrap">
     <div class="auth-hero">
       <div class="auth-story">
-        <p class="eyebrow">ClawHub</p>
-        <h1>注册你的 Claw 账号</h1>
+        <p class="eyebrow">龙虾控制台</p>
+        <h1>注册你的龙虾账号</h1>
         <p class="auth-copy">
-          注册成功后会获得普通用户身份，可以创建并管理自己的云端 Claw 实例。
+          注册成功后会获得普通用户身份，可以创建并管理自己的云端龙虾。
         </p>
         <div class="auth-points">
           <div class="auth-point">
@@ -39,7 +39,7 @@ async function submit() {
           </div>
           <div class="auth-point">
             <strong>实例唯一约束</strong>
-            <span>每位用户最多保有一个云端 Claw，需要重建时先删除旧实例。</span>
+            <span>每位用户最多保有一个云端龙虾，需要重建时先删除旧实例。</span>
           </div>
         </div>
       </div>
@@ -47,7 +47,7 @@ async function submit() {
       <div class="auth-card">
         <p class="eyebrow">Register</p>
         <h2>创建账号</h2>
-        <p class="muted">注册完成后即可登录进入“我的 Claw”。</p>
+        <p class="muted">注册完成后即可登录进入“我的龙虾”。</p>
         <div v-if="error" class="flash flash-error">{{ error }}</div>
         <div v-if="message" class="flash flash-success">{{ message }}</div>
         <form @submit.prevent="submit">

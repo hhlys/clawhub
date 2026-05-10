@@ -9,4 +9,6 @@ public interface EdgeChatMessageRepository extends JpaRepository<EdgeChatMessage
     List<EdgeChatMessage> findTop200BySessionIdOrderBySequenceNoAscIdAsc(Long sessionId);
 
     long countBySessionId(Long sessionId);
+
+    void deleteBySessionId(Long sessionId);
 }

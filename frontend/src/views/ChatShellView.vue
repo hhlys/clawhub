@@ -33,7 +33,7 @@ const requestedInstanceId = computed(() => {
 
 const frameTitle = computed(() => {
   if (!instance.value) {
-    return "Claw 控制台";
+    return "龙虾控制台";
   }
   return `${instance.value.instanceName} 控制台`;
 });
@@ -50,14 +50,14 @@ async function loadInstance() {
       ownedInstance &&
       String(ownedInstance.id) !== requestedInstanceId.value
     ) {
-      error.value = "当前账号没有找到你选择的云端 Claw，已展示当前账号的默认实例。";
+      error.value = "当前账号没有找到你选择的云端龙虾，已展示当前账号的默认实例。";
     }
 
     if (instance.value) {
       await loadSessions(true);
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "加载云端 Claw 失败";
+    error.value = err instanceof Error ? err.message : "加载云端龙虾失败";
   } finally {
     loading.value = false;
   }
@@ -104,6 +104,23 @@ async function selectSession(session: InstanceChatSession) {
       content: message.content,
       createdAt: message.createdAt
     }));
+}
+
+async function deleteSession(session: InstanceChatSession) {
+  if (streaming.value) {
+    return;
+  }
+  await apiRequest<void>(`/api/me/instance/chat/sessions/${session.id}`, {
+    method: "DELETE"
+  });
+  sessions.value = sessions.value.filter((item) => item.id !== session.id);
+  if (activeSession.value?.id === session.id) {
+    activeSession.value = null;
+    messages.value = [];
+    if (sessions.value.length > 0) {
+      await selectSession(sessions.value[0]);
+    }
+  }
 }
 
 function appendAssistantText(messageId: number, text: string) {
@@ -325,7 +342,7 @@ onMounted(loadInstance);
       <div class="bot-profile">
         <div class="bot-avatar">C</div>
         <div>
-          <strong>{{ instance?.instanceName ?? "my claw" }}</strong>
+          <strong>{{ instance?.instanceName ?? "我的龙虾" }}</strong>
           <span>{{ instance?.status === "RUNNING" ? "在线" : "未连接" }}</span>
         </div>
       </div>
@@ -341,16 +358,28 @@ onMounted(loadInstance);
 
       <div class="recent-list">
         <p>最近对话</p>
-        <button
+        <div
           v-for="session in sessions"
           :key="session.id"
-          :class="['recent-item', { active: activeSession?.id === session.id }]"
-          :disabled="streaming"
-          @click="selectSession(session)"
+          :class="['recent-row', { active: activeSession?.id === session.id }]"
         >
-          <strong>{{ session.title || "新对话" }}</strong>
-          <small>{{ formatSessionTime(session.lastMessageAt) }}</small>
-        </button>
+          <button
+            class="recent-item"
+            :disabled="streaming"
+            @click="selectSession(session)"
+          >
+            <strong>{{ session.title || "新对话" }}</strong>
+            <small>{{ formatSessionTime(session.lastMessageAt) }}</small>
+          </button>
+          <button
+            class="recent-delete"
+            :disabled="streaming"
+            title="删除会话"
+            @click.stop="deleteSession(session)"
+          >
+            ×
+          </button>
+        </div>
         <span v-if="!sessions.length && !sessionsLoading" class="recent-empty">
           暂无历史对话
         </span>
@@ -359,7 +388,7 @@ onMounted(loadInstance);
 
     <section class="chat-main embedded">
       <div class="chat-topline">
-        <strong>{{ instance?.instanceName ?? "my claw" }}</strong>
+        <strong>{{ instance?.instanceName ?? "我的龙虾" }}</strong>
         <div class="view-switcher">
           <button
             :class="['view-option', { active: mode === 'dialog' }]"
@@ -378,13 +407,13 @@ onMounted(loadInstance);
 
       <div v-if="loading" class="empty-chat">
         <h2>正在打开控制台...</h2>
-        <p>ClawHub 正在读取你的云端 Claw 实例信息。</p>
+        <p>龙虾控制台正在读取你的云端龙虾信息。</p>
       </div>
 
       <div v-else-if="!instance" class="empty-chat">
-        <h2>还没有可打开的云端 Claw</h2>
-        <p>先创建一个云端 Claw，再回到这里进入控制台聊天窗口。</p>
-        <router-link class="primary-action" to="/my-claw">去创建云端 Claw</router-link>
+        <h2>还没有可打开的云端龙虾</h2>
+        <p>先创建一个云端龙虾，再回到这里进入控制台聊天窗口。</p>
+        <router-link class="primary-action" to="/my-claw">去创建云端龙虾</router-link>
       </div>
 
       <div v-else-if="mode === 'claw'" class="console-frame-wrap">
@@ -395,7 +424,7 @@ onMounted(loadInstance);
         <div class="dialog-feed">
           <div v-if="!messages.length" class="empty-chat compact">
             <h2>{{ activeSession ? "这是一段新对话" : "开始一段新对话" }}</h2>
-            <p>这里会通过 clawhub_chat channel 展示容器内 QwenPaw 的流式回复。</p>
+            <p>这里会展示云端龙虾的流式回复。</p>
           </div>
 
           <article

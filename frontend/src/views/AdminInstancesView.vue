@@ -136,7 +136,7 @@ onMounted(async () => {
             <label>Product Type</label>
             <select v-model="form.productType">
               <option value="QWENPAW">QwenPaw</option>
-              <option value="OPENCLAW">OpenClaw</option>
+              <option value="OPENCLAW">Open龙虾</option>
               <option value="OTHER">Other</option>
             </select>
           </div>

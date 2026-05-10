@@ -148,6 +148,13 @@ public class EdgeChatService {
     }
 
     @Transactional
+    public void deleteSession(Long ownerUserId, Long sessionId) {
+        EdgeChatSession session = getOwnedSession(ownerUserId, sessionId);
+        messageRepository.deleteBySessionId(session.getId());
+        sessionRepository.delete(session);
+    }
+
+    @Transactional
     protected EdgeTask createTask(EdgeChatSession session, EdgeChatRequest request) {
         String agentId = request.agentId();
         if (agentId == null || agentId.isBlank()) {

@@ -22,46 +22,49 @@ async function submit() {
 
 <template>
   <div class="auth-wrap">
-    <div class="auth-hero">
-      <div class="auth-story">
-        <p class="eyebrow">ClawHub</p>
-        <h1>登录进入我的 Claw</h1>
-        <p class="auth-copy">
-          统一创建、查看和管理自己的云端 Claw 实例。普通用户登录后即可进入“我的 Claw”创建云实例。
-        </p>
-        <div class="auth-points">
-          <div class="auth-point">
-            <strong>用户隔离</strong>
-            <span>每个用户只看到自己的云端实例和后续任务。</span>
-          </div>
-          <div class="auth-point">
-            <strong>统一入口</strong>
-            <span>创建、启动、停止、重启和进入实例都在同一个控制台完成。</span>
-          </div>
-          <div class="auth-point">
-            <strong>云地通信扩展</strong>
-            <span>后续可在同一入口纳管边侧节点、技能下发和任务回传。</span>
-          </div>
+    <header class="login-header">
+      <router-link class="login-brand" to="/login">
+        <span class="brand-mark"></span>
+        <span>我的龙虾</span>
+      </router-link>
+    </header>
+
+    <div class="login-center">
+      <div class="login-title">
+        <h1>欢迎登录我的龙虾</h1>
+        <div class="login-tabs">
+          <span>账号登录</span>
         </div>
       </div>
 
-      <div class="auth-card">
-        <p class="eyebrow">Login</p>
-        <h2>欢迎回来</h2>
-        <p class="muted">默认普通用户：hhl / Hl123321*</p>
+      <div class="auth-card login-card">
         <div v-if="error" class="flash flash-error">{{ error }}</div>
         <form @submit.prevent="submit">
-          <div class="field">
-            <label>用户名</label>
-            <input v-model="username" autocomplete="username" />
+          <div class="login-field">
+            <input
+              v-model="username"
+              name="lobster_account"
+              autocomplete="off"
+              placeholder="请输入账号"
+            />
           </div>
-          <div class="field">
-            <label>密码</label>
-            <input v-model="password" type="password" autocomplete="current-password" />
+          <div class="login-field">
+            <input
+              v-model="password"
+              name="lobster_passcode"
+              type="password"
+              autocomplete="new-password"
+              placeholder="请输入密码"
+            />
           </div>
-          <div class="auth-actions">
-            <button class="btn btn-primary" type="submit">登录</button>
-            <router-link class="muted" to="/register">立即注册</router-link>
+          <label class="login-agreement">
+            <input type="checkbox" checked />
+            <span>我已阅读并同意用户协议和隐私政策</span>
+          </label>
+          <button class="login-submit" type="submit">登录</button>
+          <div class="login-register">
+            <span>如果没有账号，</span>
+            <router-link to="/register">立即注册</router-link>
           </div>
         </form>
       </div>

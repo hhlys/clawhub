@@ -26,6 +26,11 @@ clawhub:
     data-volume-container-path: /root/.qwenpaw
     qwenpaw-image: qwenpaw:local
     default-product-version: "1.0"
+  qwenpaw:
+    model:
+      provider-id: minimax-cn
+      model: MiniMax-M2.7
+      api-key: ${MINIMAX_API_KEY:sk-cp-Iv5D-sxLQA_DwcZw81KAMENnWB6juMp17j6ZFQciCGAvZAQpLdnZozRoUZDG7pKuUkVyB99G3v1lg3fW0Ajmt6EeT5Y2ku5fupMg1KkZkOj2zqCMOGy7qZk}
   edge:
     registration-token:
     offline-after: 90s

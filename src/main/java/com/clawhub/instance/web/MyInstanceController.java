@@ -37,8 +37,7 @@ public class MyInstanceController {
     public ManagedInstanceResponse create(@AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody CreateInstanceRequest request) {
         return ManagedInstanceResponse.from(managedInstanceService.createForOwner(
                 principal.getId(),
-                request.productType(),
-                request.productVersion()
+                request.instanceName()
         ));
     }
 

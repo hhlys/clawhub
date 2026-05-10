@@ -16,6 +16,7 @@ import com.clawhub.user.service.AppUserService;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,19 +32,22 @@ public class ManagedInstanceService {
     private final AppUserService userService;
     private final PlatformLimitsProperties platformLimitsProperties;
     private final ClawProvisioningProperties provisioningProperties;
+    private final QwenPawModelBootstrapService modelBootstrapService;
 
     public ManagedInstanceService(
             ManagedInstanceRepository repository,
             DockerRuntimeService dockerRuntimeService,
             AppUserService userService,
             PlatformLimitsProperties platformLimitsProperties,
-            ClawProvisioningProperties provisioningProperties
+            ClawProvisioningProperties provisioningProperties,
+            QwenPawModelBootstrapService modelBootstrapService
     ) {
         this.repository = repository;
         this.dockerRuntimeService = dockerRuntimeService;
         this.userService = userService;
         this.platformLimitsProperties = platformLimitsProperties;
         this.provisioningProperties = provisioningProperties;
+        this.modelBootstrapService = modelBootstrapService;
     }
 
     @Transactional(readOnly = true)
@@ -81,33 +85,25 @@ public class ManagedInstanceService {
     @Transactional
     public ManagedInstance createForOwner(
             Long ownerUserId,
-            ProductType productType,
-            String productVersion
+            String requestedInstanceName
     ) {
         AppUser ownerUser = validateCreatePreconditions(ownerUserId);
-        if (productType != ProductType.QWENPAW) {
-            throw new IllegalArgumentException("Only QwenPaw is currently supported");
-        }
-        if (!provisioningProperties.getDefaultProductVersion().equals(productVersion)) {
-            throw new IllegalArgumentException("Unsupported product version: " + productVersion);
-        }
-
-        String sanitizedUsername = ownerUser.getUsername().toLowerCase();
-        String instanceName = sanitizedUsername + "-claw-instance";
-        String containerName = sanitizedUsername + "-claw-container";
+        String instanceName = normalizeInstanceName(requestedInstanceName);
+        String resourceName = toDockerSafeName(instanceName, ownerUser.getUsername());
+        String containerName = resourceName + "-container";
         int hostPort = findNextAvailableHostPort();
         String host = provisioningProperties.getDefaultHost();
         int containerPort = provisioningProperties.getContainerPort();
         String dockerImage = provisioningProperties.getQwenpawImage();
-        String dataVolumeHostPath = provisioningProperties.getDataVolumeHostRootPath() + "/" + sanitizedUsername + "-claw-data";
+        String dataVolumeHostPath = provisioningProperties.getDataVolumeHostRootPath() + "/" + resourceName + "-data";
         String dataVolumeContainerPath = provisioningProperties.getDataVolumeContainerPath();
         String publicBaseUrl = "http://" + host + ":" + hostPort;
 
         validateUniqueFields(instanceName, containerName, hostPort);
         return persistAndOptionallyStart(
                 ownerUser,
-                productType,
-                productVersion,
+                ProductType.QWENPAW,
+                provisioningProperties.getDefaultProductVersion(),
                 instanceName,
                 containerName,
                 dockerImage,
@@ -230,6 +226,37 @@ public class ManagedInstanceService {
         }
     }
 
+    private String normalizeInstanceName(String requestedInstanceName) {
+        String instanceName = requestedInstanceName == null ? "" : requestedInstanceName.trim();
+        if (instanceName.isBlank()) {
+            throw new IllegalArgumentException("Instance name is required");
+        }
+        if (instanceName.length() > 64) {
+            throw new IllegalArgumentException("Instance name must be 64 characters or less");
+        }
+        return instanceName;
+    }
+
+    private String toDockerSafeName(String value, String fallback) {
+        String fallbackName = fallback == null || fallback.isBlank() ? "claw" : fallback;
+        String normalized = value == null ? "" : value.toLowerCase(Locale.ROOT);
+        String slug = normalized
+                .replaceAll("[^a-z0-9_.-]+", "-")
+                .replaceAll("^[._-]+|[._-]+$", "");
+        if (slug.isBlank()) {
+            slug = fallbackName.toLowerCase(Locale.ROOT)
+                    .replaceAll("[^a-z0-9_.-]+", "-")
+                    .replaceAll("^[._-]+|[._-]+$", "");
+        }
+        if (slug.isBlank()) {
+            slug = "claw";
+        }
+        if (slug.length() > 48) {
+            slug = slug.substring(0, 48).replaceAll("[._-]+$", "");
+        }
+        return slug;
+    }
+
     private AppUser validateCreatePreconditions(Long ownerUserId) {
         AppUser ownerUser = userService.getRequired(ownerUserId);
         if (ownerUser.getStatus() != UserStatus.ACTIVE) {
@@ -274,6 +301,7 @@ public class ManagedInstanceService {
         instance.setPublicBaseUrl(publicBaseUrl);
         instance.setStatus(InstanceStatus.PENDING);
         repository.save(instance);
+        modelBootstrapService.bootstrap(instance);
 
         if (autoStart) {
             dockerRuntimeService.createAndStart(instance);

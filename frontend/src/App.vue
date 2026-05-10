@@ -14,7 +14,7 @@ const navItems = computed(() => {
   return [
     { label: "对话", to: "/chat", icon: "chat" },
     { label: "云边对话", to: "/edge-chat", icon: "edge" },
-    { label: "我的 Claw", to: "/my-claw", icon: "claw" },
+    { label: "我的龙虾", to: "/my-claw", icon: "claw" },
     { label: "文件", to: "/files", icon: "file" }
   ];
 });
@@ -31,7 +31,7 @@ async function handleLogout() {
       <header class="global-header">
         <router-link class="brand" to="/my-claw">
           <span class="brand-mark"></span>
-          <span>ClawHub</span>
+          <span>龙虾控制台</span>
         </router-link>
 
         <div class="user-menu">
