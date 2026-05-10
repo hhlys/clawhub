@@ -34,6 +34,16 @@ public class AdminEdgeNodeController {
     @PostMapping("/{nodeId}/dispatch")
     public SseEmitter dispatch(@PathVariable String nodeId,
                                @Valid @RequestBody IntentDispatchRequest request) {
-        return edgeNodeService.dispatchIntent(nodeId, request.message());
+        return edgeNodeService.dispatchIntent(nodeId, request);
+    }
+
+    @GetMapping("/{nodeId}/tasks")
+    public List<EdgeTaskResponse> tasks(@PathVariable String nodeId) {
+        return edgeNodeService.listNodeTasks(nodeId);
+    }
+
+    @GetMapping("/conversations/{conversationId}/events")
+    public List<EdgeTaskEventResponse> conversationEvents(@PathVariable String conversationId) {
+        return edgeNodeService.listConversationEvents(conversationId);
     }
 }

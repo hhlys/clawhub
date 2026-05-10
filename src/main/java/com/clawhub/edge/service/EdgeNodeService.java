@@ -2,23 +2,31 @@ package com.clawhub.edge.service;
 
 import com.clawhub.edge.config.EdgeProperties;
 import com.clawhub.edge.domain.EdgeNode;
+import com.clawhub.edge.domain.EdgeTask;
+import com.clawhub.edge.domain.EdgeTaskEvent;
 import com.clawhub.edge.repo.EdgeNodeRepository;
+import com.clawhub.edge.repo.EdgeTaskEventRepository;
+import com.clawhub.edge.repo.EdgeTaskRepository;
+import com.clawhub.edge.web.EdgeTaskCompleteRequest;
+import com.clawhub.edge.web.EdgeTaskEventRequest;
+import com.clawhub.edge.web.EdgeTaskEventResponse;
+import com.clawhub.edge.web.EdgeTaskPollRequest;
+import com.clawhub.edge.web.EdgeTaskPollResponse;
+import com.clawhub.edge.web.EdgeTaskResponse;
+import com.clawhub.edge.web.EdgeNodeEventRequest;
 import com.clawhub.edge.web.EdgeNodeHeartbeatRequest;
 import com.clawhub.edge.web.EdgeNodeRegisterRequest;
 import com.clawhub.edge.web.EdgeNodeResponse;
+import com.clawhub.edge.web.IntentDispatchRequest;
+import com.clawhub.edgechat.service.EdgeChatEventIngestService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -39,17 +47,26 @@ public class EdgeNodeService {
     };
 
     private final EdgeNodeRepository edgeNodeRepository;
+    private final EdgeTaskRepository edgeTaskRepository;
+    private final EdgeTaskEventRepository edgeTaskEventRepository;
     private final EdgeProperties edgeProperties;
     private final ObjectMapper objectMapper;
+    private final EdgeChatEventIngestService edgeChatEventIngestService;
 
     public EdgeNodeService(
             EdgeNodeRepository edgeNodeRepository,
+            EdgeTaskRepository edgeTaskRepository,
+            EdgeTaskEventRepository edgeTaskEventRepository,
             EdgeProperties edgeProperties,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            EdgeChatEventIngestService edgeChatEventIngestService
     ) {
         this.edgeNodeRepository = edgeNodeRepository;
+        this.edgeTaskRepository = edgeTaskRepository;
+        this.edgeTaskEventRepository = edgeTaskEventRepository;
         this.edgeProperties = edgeProperties;
         this.objectMapper = objectMapper;
+        this.edgeChatEventIngestService = edgeChatEventIngestService;
     }
 
     @Transactional
@@ -122,71 +139,19 @@ public class EdgeNodeService {
         return toResponse(node, now);
     }
 
-    public SseEmitter dispatchIntent(String nodeId, String message) {
+    public SseEmitter dispatchIntent(String nodeId, IntentDispatchRequest request) {
         EdgeNode node = edgeNodeRepository.findByNodeId(nodeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Edge node not found"));
 
-        if (node.getHostIp() == null || node.getHostIp().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edge node has no host IP");
-        }
-        if (node.getPort() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edge node has no port");
-        }
-
-        String url = "http://" + node.getHostIp() + ":" + node.getPort() + "/api/cloud/chat";
-        SseEmitter emitter = new SseEmitter(60_000L);
+        EdgeTask task = createTask(node, request);
+        SseEmitter emitter = new SseEmitter(120_000L);
 
         Thread dispatchThread = new Thread(() -> {
             try {
-                log.info("Dispatching intent to node {} at {}", nodeId, url);
-
-                String jsonBody = objectMapper.writeValueAsString(
-                        Map.of("message", message,
-                               "user_id", "clawhub-admin",
-                               "session_id", "cloud:" + nodeId + ":" + System.currentTimeMillis())
-                );
-
-                HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
-                conn.setConnectTimeout(10_000);
-                conn.setReadTimeout(60_000);
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setDoOutput(true);
-
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
-                }
-
-                int status = conn.getResponseCode();
-                if (status != 200) {
-                    String errorBody;
-                    try (var in = conn.getErrorStream() != null
-                            ? conn.getErrorStream()
-                            : conn.getInputStream()) {
-                        errorBody = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-                    }
-                    log.warn("Dispatch to {} returned status {}: {}", nodeId, status, errorBody);
-                    emitter.send(SseEmitter.event()
-                            .data("{\"error\":\"Edge returned " + status
-                                  + ": " + escapeJson(errorBody) + "\"}"));
-                    emitter.complete();
-                    return;
-                }
-
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        if (line.startsWith("data: ")) {
-                            emitter.send(SseEmitter.event().data(line.substring(6)));
-                        }
-                    }
-                }
-                conn.disconnect();
-                emitter.complete();
-
+                log.info("Queued edge task {} for node {}", task.getTaskId(), nodeId);
+                streamTaskEvents(task.getTaskId(), emitter);
             } catch (Exception e) {
-                log.error("Dispatch to node {} at {} failed", nodeId, url, e);
+                log.error("Dispatch stream failed for node {}", nodeId, e);
                 String errMsg = e.getMessage();
                 if (errMsg == null || errMsg.isBlank()) {
                     errMsg = e.getClass().getSimpleName() + " - check ClawHub server logs for details";
@@ -205,6 +170,238 @@ public class EdgeNodeService {
         dispatchThread.start();
 
         return emitter;
+    }
+
+    @Transactional
+    public EdgeTaskPollResponse pollTask(EdgeTaskPollRequest request, String headerToken) {
+        validateToken(request.token(), headerToken);
+        EdgeNode node = edgeNodeRepository.findByNodeId(request.nodeId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Edge node is not registered"));
+        node.setLastSeenAt(Instant.now());
+
+        EdgeTask task = edgeTaskRepository
+                .findFirstByNodeIdAndStatusOrderByCreatedAtAsc(request.nodeId(), "pending")
+                .orElse(null);
+        if (task == null) {
+            return EdgeTaskPollResponse.empty();
+        }
+
+        task.setStatus("running");
+        task.setLeasedAt(Instant.now());
+        task.setAttempts((task.getAttempts() == null ? 0 : task.getAttempts()) + 1);
+        EdgeTask saved = edgeTaskRepository.save(task);
+
+        appendEvent(
+                saved.getTaskId(),
+                saved.getConversationId(),
+                0L,
+                "task_started",
+                "",
+                Map.of(
+                        "object", "task",
+                        "status", "running",
+                        "task_id", saved.getTaskId(),
+                        "conversation_id", saved.getConversationId()
+                )
+        );
+
+        return new EdgeTaskPollResponse(
+                saved.getTaskId(),
+                saved.getConversationId(),
+                saved.getNodeId(),
+                saved.getInstruction(),
+                saved.getAgentId()
+        );
+    }
+
+    @Transactional
+    public EdgeTaskEventResponse appendTaskEvent(
+            String taskId,
+            EdgeTaskEventRequest request,
+            String headerToken
+    ) {
+        validateToken(request.token(), headerToken);
+        EdgeTask task = getTaskForNode(taskId, request.nodeId());
+        EdgeTaskEvent event = appendEvent(
+                task.getTaskId(),
+                request.conversationId(),
+                request.sequence(),
+                request.eventType(),
+                request.content(),
+                request.rawEvent() == null ? Map.of() : request.rawEvent()
+        );
+        return toEventResponse(event);
+    }
+
+    @Transactional
+    public EdgeTaskEventResponse appendNodeEvent(EdgeNodeEventRequest request, String headerToken) {
+        validateToken(request.token(), headerToken);
+        EdgeNode node = edgeNodeRepository.findByNodeId(request.nodeId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Edge node is not registered"));
+        node.setLastSeenAt(Instant.now());
+
+        String conversationId = request.conversationId();
+        if (conversationId == null || conversationId.isBlank()) {
+            conversationId = "edge:" + request.nodeId() + ":events";
+        }
+        String taskId = "edge-event-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8);
+
+        Map<String, Object> raw = request.rawEvent() == null
+                ? Map.of(
+                        "object", "edge_event",
+                        "event_type", request.eventType(),
+                        "node_id", request.nodeId(),
+                        "conversation_id", conversationId,
+                        "content", request.content() == null ? "" : request.content()
+                )
+                : request.rawEvent();
+
+        EdgeTaskEvent event = appendEvent(
+                taskId,
+                conversationId,
+                0L,
+                request.eventType(),
+                request.content(),
+                raw
+        );
+        edgeChatEventIngestService.appendEdgeEvent(event);
+        return toEventResponse(event);
+    }
+
+    @Transactional
+    public EdgeTaskResponse completeTask(
+            String taskId,
+            EdgeTaskCompleteRequest request,
+            String headerToken
+    ) {
+        validateToken(request.token(), headerToken);
+        EdgeTask task = getTaskForNode(taskId, request.nodeId());
+        String status = normalizeTerminalStatus(request.status());
+        task.setStatus(status);
+        task.setResponse(request.response());
+        task.setError(request.error());
+        task.setCompletedAt(Instant.now());
+        EdgeTask saved = edgeTaskRepository.save(task);
+
+        appendEvent(
+                saved.getTaskId(),
+                request.conversationId(),
+                Long.MAX_VALUE,
+                "task_" + status,
+                request.response(),
+                Map.of(
+                        "object", "response",
+                        "status", status,
+                        "task_id", saved.getTaskId(),
+                        "conversation_id", request.conversationId(),
+                        "response", request.response() == null ? "" : request.response(),
+                        "error", request.error() == null ? "" : request.error()
+                )
+        );
+
+        return toTaskResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EdgeTaskResponse> listNodeTasks(String nodeId) {
+        return edgeTaskRepository.findTop20ByNodeIdOrderByCreatedAtDesc(nodeId)
+                .stream()
+                .map(this::toTaskResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<EdgeTaskEventResponse> listConversationEvents(String conversationId) {
+        return edgeTaskEventRepository.findTop200ByConversationIdOrderByIdAsc(conversationId)
+                .stream()
+                .map(this::toEventResponse)
+                .toList();
+    }
+
+    @Transactional
+    protected EdgeTask createTask(EdgeNode node, IntentDispatchRequest request) {
+        String taskId = "edge-task-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8);
+        String conversationId = request.conversationId();
+        if (conversationId == null || conversationId.isBlank()) {
+            conversationId = "edge:" + node.getNodeId() + ":default";
+        }
+        String agentId = request.agentId();
+        if (agentId == null || agentId.isBlank()) {
+            agentId = "default";
+        }
+
+        EdgeTask task = new EdgeTask();
+        task.setTaskId(taskId);
+        task.setConversationId(conversationId);
+        task.setNodeId(node.getNodeId());
+        task.setTenantId(node.getTenantId());
+        task.setInstruction(request.message());
+        task.setAgentId(agentId);
+        task.setStatus("pending");
+        return edgeTaskRepository.save(task);
+    }
+
+    private void streamTaskEvents(String taskId, SseEmitter emitter) throws Exception {
+        long deadline = System.currentTimeMillis() + 120_000L;
+        Long lastEventId = 0L;
+
+        while (System.currentTimeMillis() < deadline) {
+            List<EdgeTaskEvent> events = edgeTaskEventRepository
+                    .findByTaskIdAndIdGreaterThanOrderByIdAsc(taskId, lastEventId);
+            for (EdgeTaskEvent event : events) {
+                lastEventId = event.getId();
+                emitter.send(SseEmitter.event().data(event.getRawJson()));
+            }
+
+            EdgeTask task = edgeTaskRepository.findByTaskId(taskId).orElse(null);
+            if (task != null && isTerminal(task.getStatus())) {
+                emitter.complete();
+                return;
+            }
+
+            Thread.sleep(300L);
+        }
+
+        emitter.send(SseEmitter.event().data("{\"error\":\"Timed out waiting for edge task result\"}"));
+        emitter.complete();
+    }
+
+    private EdgeTask getTaskForNode(String taskId, String nodeId) {
+        EdgeTask task = edgeTaskRepository.findByTaskId(taskId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Edge task not found"));
+        if (!task.getNodeId().equals(nodeId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Edge task does not belong to node");
+        }
+        return task;
+    }
+
+    private EdgeTaskEvent appendEvent(
+            String taskId,
+            String conversationId,
+            Long sequence,
+            String eventType,
+            String content,
+            Map<String, Object> rawEvent
+    ) {
+        EdgeTaskEvent event = new EdgeTaskEvent();
+        event.setTaskId(taskId);
+        event.setConversationId(conversationId);
+        event.setSequenceNo(sequence == null ? 0L : sequence);
+        event.setEventType(eventType == null || eventType.isBlank() ? "event" : eventType);
+        event.setContent(content);
+        event.setRawJson(toJson(rawEvent == null ? Map.of() : rawEvent));
+        return edgeTaskEventRepository.save(event);
+    }
+
+    private boolean isTerminal(String status) {
+        return "completed".equals(status) || "failed".equals(status) || "cancelled".equals(status);
+    }
+
+    private String normalizeTerminalStatus(String status) {
+        if ("completed".equals(status) || "failed".equals(status) || "cancelled".equals(status)) {
+            return status;
+        }
+        return "failed";
     }
 
     private static String escapeJson(String s) {
@@ -248,6 +445,38 @@ public class EdgeNodeService {
                 node.getLastSeenAt(),
                 node.getCreatedAt(),
                 node.getUpdatedAt()
+        );
+    }
+
+    private EdgeTaskResponse toTaskResponse(EdgeTask task) {
+        return new EdgeTaskResponse(
+                task.getId(),
+                task.getTaskId(),
+                task.getConversationId(),
+                task.getNodeId(),
+                task.getTenantId(),
+                task.getInstruction(),
+                task.getAgentId(),
+                task.getStatus(),
+                task.getAttempts(),
+                task.getResponse(),
+                task.getError(),
+                task.getCreatedAt(),
+                task.getUpdatedAt(),
+                task.getCompletedAt()
+        );
+    }
+
+    private EdgeTaskEventResponse toEventResponse(EdgeTaskEvent event) {
+        return new EdgeTaskEventResponse(
+                event.getId(),
+                event.getTaskId(),
+                event.getConversationId(),
+                event.getSequenceNo(),
+                event.getEventType(),
+                event.getContent(),
+                readMap(event.getRawJson()),
+                event.getCreatedAt()
         );
     }
 

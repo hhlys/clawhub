@@ -2,6 +2,7 @@ package com.clawhub;
 
 import com.clawhub.config.DockerProperties;
 import com.clawhub.config.BootstrapAdminProperties;
+import com.clawhub.config.BootstrapUserProperties;
 import com.clawhub.config.ClawProvisioningProperties;
 import com.clawhub.config.PlatformLimitsProperties;
 import org.springframework.boot.SpringApplication;
@@ -12,6 +13,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 @EnableConfigurationProperties({
         DockerProperties.class,
         BootstrapAdminProperties.class,
+        BootstrapUserProperties.class,
         PlatformLimitsProperties.class,
         ClawProvisioningProperties.class
 })

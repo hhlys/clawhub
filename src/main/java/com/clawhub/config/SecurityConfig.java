@@ -31,7 +31,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/index.html", "/favicon.ico", "/login", "/register", "/my-instance", "/admin/**", "/assets/**").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
-                        .requestMatchers("/api/edge/nodes/register", "/api/edge/nodes/heartbeat").permitAll()
+                        .requestMatchers(
+                                "/api/edge/nodes/register",
+                                "/api/edge/nodes/heartbeat",
+                                "/api/edge/tasks/poll",
+                                "/api/edge/tasks/events",
+                                "/api/edge/tasks/{taskId}/events",
+                                "/api/edge/tasks/{taskId}/complete"
+                        ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/me/**", "/api/auth/me", "/api/auth/logout").authenticated()
                         .requestMatchers("/api/platform/capacity").permitAll()

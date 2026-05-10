@@ -18,7 +18,7 @@ async function submit() {
     message.value = "注册成功，请使用新账号登录。";
     setTimeout(() => router.push("/login"), 800);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Registration failed";
+    error.value = err instanceof Error ? err.message : "注册失败";
   }
 }
 </script>
@@ -27,27 +27,27 @@ async function submit() {
   <div class="auth-wrap">
     <div class="auth-hero">
       <div class="auth-story">
-        <p class="eyebrow">我的AI云平台</p>
-        <h1>注册你的Claw账号</h1>
+        <p class="eyebrow">ClawHub</p>
+        <h1>注册你的 Claw 账号</h1>
         <p class="auth-copy">
-          注册成功后你会获得普通用户身份，可以创建并管理自己的 Claw 实例。
+          注册成功后会获得普通用户身份，可以创建并管理自己的云端 Claw 实例。
         </p>
         <div class="auth-points">
           <div class="auth-point">
             <strong>默认普通用户</strong>
-            <span>公开注册只创建普通用户账号，不会授予管理员权限。</span>
+            <span>公开注册不会授予管理员权限。</span>
           </div>
           <div class="auth-point">
             <strong>实例唯一约束</strong>
-            <span>每位用户最多保有一个实例，需要重建时先删除旧实例。</span>
+            <span>每位用户最多保有一个云端 Claw，需要重建时先删除旧实例。</span>
           </div>
         </div>
       </div>
 
       <div class="auth-card">
-        <p class="eyebrow">注册</p>
-        <h2>创建我的AI云平台账号</h2>
-        <p class="muted">注册完成后即可登录进入我的Claw。</p>
+        <p class="eyebrow">Register</p>
+        <h2>创建账号</h2>
+        <p class="muted">注册完成后即可登录进入“我的 Claw”。</p>
         <div v-if="error" class="flash flash-error">{{ error }}</div>
         <div v-if="message" class="flash flash-success">{{ message }}</div>
         <form @submit.prevent="submit">

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, nextTick, watch } from "vue";
 import { apiRequest } from "../api";
-import type { EdgeNode } from "../types";
+import type { EdgeNode, EdgeTaskEvent } from "../types";
 
 const nodes = ref<EdgeNode[]>([]);
 const error = ref("");
@@ -15,6 +15,8 @@ const dispatchMessage = ref("");
 const dispatchStreaming = ref(false);
 const dispatchResult = ref("");
 const dispatchError = ref("");
+const dispatchConversationId = ref("");
+const conversationEvents = ref<EdgeTaskEvent[]>([]);
 const resultPanel = ref<HTMLDivElement | null>(null);
 
 // auto-scroll result panel as text arrives
@@ -35,6 +37,25 @@ function formatEndpoint(node: EdgeNode) {
   return `${node.hostIp || "-"}:${node.port ?? "-"}`;
 }
 
+function defaultConversationId(node: EdgeNode) {
+  return `edge:${node.nodeId}:default`;
+}
+
+function eventDisplayText(event: EdgeTaskEvent) {
+  if (event.content) return event.content;
+  const raw = event.rawEvent || {};
+  if (typeof raw.response === "string") return raw.response;
+  if (typeof raw.error === "string") return raw.error;
+  return "";
+}
+
+async function loadConversationEvents() {
+  if (!dispatchConversationId.value) return;
+  conversationEvents.value = await apiRequest<EdgeTaskEvent[]>(
+    `/api/admin/edge-nodes/conversations/${encodeURIComponent(dispatchConversationId.value)}/events`,
+  );
+}
+
 async function loadNodes() {
   loading.value = true;
   error.value = "";
@@ -48,12 +69,19 @@ async function loadNodes() {
   }
 }
 
-function openDispatch(node: EdgeNode) {
+async function openDispatch(node: EdgeNode) {
   dispatchNode.value = node;
   dispatchMessage.value = "";
   dispatchResult.value = "";
   dispatchError.value = "";
+  dispatchConversationId.value = defaultConversationId(node);
+  conversationEvents.value = [];
   dispatchDialog.value = true;
+  try {
+    await loadConversationEvents();
+  } catch (err) {
+    dispatchError.value = err instanceof Error ? err.message : "Failed to load conversation";
+  }
 }
 
 function closeDispatch() {
@@ -78,7 +106,10 @@ async function sendDispatch() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: dispatchMessage.value }),
+        body: JSON.stringify({
+          message: dispatchMessage.value,
+          conversationId: dispatchConversationId.value,
+        }),
       },
     );
 
@@ -153,6 +184,11 @@ async function sendDispatch() {
     dispatchError.value = err instanceof Error ? err.message : "Dispatch failed";
   } finally {
     dispatchStreaming.value = false;
+    try {
+      await loadConversationEvents();
+    } catch {
+      // Best-effort history refresh.
+    }
   }
 }
 
@@ -263,6 +299,34 @@ onMounted(loadNodes);
             placeholder="例如：检查服务器磁盘使用情况，清理 /tmp 下超过 7 天的文件"
             :disabled="dispatchStreaming"
           ></textarea>
+        </div>
+
+        <div
+          v-if="conversationEvents.length"
+          style="
+            background: rgba(255,255,255,0.72);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 14px;
+            max-height: 220px;
+            overflow: auto;
+          "
+        >
+          <div class="muted" style="font-size:13px;margin-bottom:8px">
+            Conversation: {{ dispatchConversationId }}
+          </div>
+          <div
+            v-for="event in conversationEvents"
+            :key="event.id"
+            style="font-size:13px;line-height:1.6;margin-bottom:8px"
+          >
+            <span class="mono">[{{ event.eventType }}]</span>
+            <span class="muted"> {{ formatTime(event.createdAt) }}</span>
+            <div v-if="eventDisplayText(event)" style="white-space:pre-wrap">
+              {{ eventDisplayText(event) }}
+            </div>
+          </div>
         </div>
 
         <div class="btn-row" style="margin-bottom:18px">

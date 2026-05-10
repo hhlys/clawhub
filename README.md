@@ -45,6 +45,7 @@ npm run build
 cd ..
 mvn -DskipTests package
 docker build -t clawhub:mvp .
+docker save -o clawhub_mvp.tar clawhub:mvp
 ```
 
 ## Deploy MVP container on a cloud server

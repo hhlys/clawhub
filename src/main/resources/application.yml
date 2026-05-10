@@ -34,3 +34,7 @@ clawhub:
       enabled: true
       username: hhlys
       password: Hl123321*
+    default-user:
+      enabled: true
+      username: hhl
+      password: Hl123321*

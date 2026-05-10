@@ -36,6 +36,26 @@ export interface ManagedInstance {
   updatedAt: string;
 }
 
+export interface InstanceChatSession {
+  id: number;
+  instanceId: number;
+  qwenpawSessionId: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string;
+}
+
+export interface InstanceChatMessage {
+  id: number;
+  sessionId: number;
+  role: "user" | "assistant" | "system";
+  content: string;
+  sequenceNo: number;
+  createdAt: string;
+}
+
 export interface EdgeNode {
   id: number;
   nodeId: string;
@@ -53,6 +73,56 @@ export interface EdgeNode {
   lastSeenAt: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EdgeChatNode {
+  id: number;
+  nodeId: string;
+  tenantId: string;
+  groupName: string;
+  username: string;
+  hostIp: string | null;
+  port: number | null;
+  osName: string | null;
+  arch: string | null;
+  qwenpawVersion: string | null;
+  capabilities: string[];
+  metadata: Record<string, unknown>;
+  status: "online" | "offline";
+  lastSeenAt: string;
+}
+
+export interface EdgeChatSession {
+  id: number;
+  nodeId: string;
+  nodeName: string;
+  conversationId: string;
+  title: string;
+  kind: "chat" | "task";
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string;
+}
+
+export interface EdgeChatMessage {
+  id: number;
+  sessionId: number;
+  role: "user" | "assistant" | "system";
+  content: string;
+  sequenceNo: number;
+  createdAt: string;
+}
+
+export interface EdgeTaskEvent {
+  id: number;
+  taskId: string;
+  conversationId: string;
+  sequence: number;
+  eventType: string;
+  content: string | null;
+  rawEvent: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface Capacity {

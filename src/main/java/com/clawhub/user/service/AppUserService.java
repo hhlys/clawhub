@@ -2,6 +2,7 @@ package com.clawhub.user.service;
 
 import com.clawhub.common.error.ConflictException;
 import com.clawhub.config.BootstrapAdminProperties;
+import com.clawhub.config.BootstrapUserProperties;
 import com.clawhub.user.domain.AppUser;
 import com.clawhub.user.domain.UserRole;
 import com.clawhub.user.domain.UserStatus;
@@ -21,11 +22,18 @@ public class AppUserService {
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final BootstrapAdminProperties bootstrapAdminProperties;
+    private final BootstrapUserProperties bootstrapUserProperties;
 
-    public AppUserService(AppUserRepository userRepository, PasswordEncoder passwordEncoder, BootstrapAdminProperties bootstrapAdminProperties) {
+    public AppUserService(
+            AppUserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            BootstrapAdminProperties bootstrapAdminProperties,
+            BootstrapUserProperties bootstrapUserProperties
+    ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.bootstrapAdminProperties = bootstrapAdminProperties;
+        this.bootstrapUserProperties = bootstrapUserProperties;
     }
 
     @PostConstruct
@@ -43,6 +51,23 @@ public class AppUserService {
         admin.setRole(UserRole.ADMIN);
         admin.setStatus(UserStatus.ACTIVE);
         userRepository.save(admin);
+    }
+
+    @PostConstruct
+    @Transactional
+    public void bootstrapDefaultUserIfNeeded() {
+        if (!bootstrapUserProperties.isEnabled()) {
+            return;
+        }
+        if (userRepository.existsByUsername(bootstrapUserProperties.getUsername())) {
+            return;
+        }
+        AppUser user = new AppUser();
+        user.setUsername(bootstrapUserProperties.getUsername());
+        user.setPasswordHash(passwordEncoder.encode(bootstrapUserProperties.getPassword()));
+        user.setRole(UserRole.USER);
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
     }
 
     @Transactional(readOnly = true)

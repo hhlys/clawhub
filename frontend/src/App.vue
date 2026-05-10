@@ -11,18 +11,11 @@ const navItems = computed(() => {
     return [];
   }
 
-  return [{ label: "我的Claw", to: "/my-instance" }];
-});
-
-const adminQuickLinks = computed(() => {
-  if (auth.user?.role !== "ADMIN") {
-    return [];
-  }
-
   return [
-    { label: "Edge Nodes", to: "/admin/edge-nodes" },
-    { label: "实例总览", to: "/admin/instances" },
-    { label: "用户管理", to: "/admin/users" }
+    { label: "对话", to: "/chat", icon: "chat" },
+    { label: "云边对话", to: "/edge-chat", icon: "edge" },
+    { label: "我的 Claw", to: "/my-claw", icon: "claw" },
+    { label: "文件", to: "/files", icon: "file" }
   ];
 });
 
@@ -33,54 +26,46 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="app-frame">
-    <div class="layout" :class="{ 'auth-layout': !auth.user }">
-      <aside v-if="auth.user" class="sidebar">
-        <div class="sidebar-brand">
-          <p class="eyebrow">我的AI云平台</p>
-          <h1>我的AI云平台</h1>
-          <p class="muted">统一管理你的专属 Claw 实例。</p>
+  <div class="app-shell" :class="{ 'auth-shell': !auth.user }">
+    <template v-if="auth.user">
+      <header class="global-header">
+        <router-link class="brand" to="/my-claw">
+          <span class="brand-mark"></span>
+          <span>ClawHub</span>
+        </router-link>
+
+        <div class="user-menu">
+          <div class="user-avatar">{{ auth.user.username.slice(0, 1).toUpperCase() }}</div>
+          <div class="user-meta">
+            <strong>{{ auth.user.username }}</strong>
+            <span>{{ auth.user.role === "ADMIN" ? "管理员" : "普通用户" }}</span>
+          </div>
+          <button class="ghost-button" @click="handleLogout">退出</button>
         </div>
-        <nav class="sidebar-nav">
+      </header>
+
+      <div class="workspace-layout">
+        <aside class="rail">
           <router-link
             v-for="item in navItems"
             :key="item.to"
             :to="item.to"
-            class="nav-link"
+            class="rail-link"
             active-class="active"
           >
-            {{ item.label }}
+            <span class="rail-icon" :class="`icon-${item.icon}`"></span>
+            <span>{{ item.label }}</span>
           </router-link>
-        </nav>
-      </aside>
+        </aside>
 
-      <main class="main-content">
-        <header v-if="auth.user" class="topbar">
-          <div>
-            <p class="eyebrow">我的AI云平台</p>
-            <h2 class="page-brand">欢迎回来，{{ auth.user.username }}</h2>
-          </div>
-          <div class="userbox">
-            <div v-if="adminQuickLinks.length" class="topbar-links">
-              <router-link
-                v-for="item in adminQuickLinks"
-                :key="item.to"
-                :to="item.to"
-                class="topbar-link"
-              >
-                {{ item.label }}
-              </router-link>
-            </div>
-            <div>
-              <strong>{{ auth.user.username }}</strong>
-              <span>{{ auth.user.role === "ADMIN" ? "管理员" : "普通用户" }}</span>
-            </div>
-            <button class="btn btn-soft" @click="handleLogout">退出登录</button>
-          </div>
-        </header>
+        <main class="page-host">
+          <router-view />
+        </main>
+      </div>
+    </template>
 
-        <router-view />
-      </main>
-    </div>
+    <main v-else class="auth-host">
+      <router-view />
+    </main>
   </div>
 </template>
